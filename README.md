@@ -362,10 +362,54 @@ The `/state/all` response includes these fields:
 ## Troubleshooting
 
 ### "I can't SSH into the Pi"
+
+**Quick checks first:**
 - Is it powered on? The green LED should blink occasionally.
 - Is it on the same WiFi? Double-check the WiFi name/password you set in Raspberry Pi Imager.
-- Wait 2 full minutes on first boot before trying.
-- Try the IP address instead of `poolcontroller.local` (check your router's device list).
+- Wait 2 full minutes on first boot before trying — the first boot is slow.
+
+**Step-by-step diagnosis:**
+
+1. **Check if the Pi is on your network at all:**
+   ```bash
+   # Send a network ping to see if the Pi responds
+   ping poolcontroller.local
+   ```
+   If it says "could not find host" or "request timed out," the Pi either isn't connected to WiFi or your router doesn't support `.local` names. Move to step 2.
+
+2. **Find the Pi by IP address instead:**
+   - Log into your router's admin page (usually `http://192.168.1.1` or `http://192.168.0.1` in a browser)
+   - Look for "Connected Devices," "DHCP Client List," or similar
+   - Find a device named `poolcontroller` and note its IP (e.g., `192.168.1.42`)
+   - Try pinging and SSH'ing with the IP directly:
+   ```bash
+   ping 192.168.1.42
+   ssh pi@192.168.1.42
+   ```
+
+3. **If the Pi doesn't appear in your router's device list at all:**
+   - The Pi isn't connecting to WiFi. The most common causes:
+     - **Wrong WiFi password** — you'll need to re-flash the SD card with the correct credentials (repeat Step 1)
+     - **5 GHz only network** — the Pi Zero 2W only supports 2.4 GHz WiFi. If your router only broadcasts 5 GHz, the Pi can't connect. Check your router settings and enable a 2.4 GHz band.
+     - **Hidden SSID** — if your WiFi name is hidden, the Pi may not find it. Temporarily make it visible, or add the network manually in the `wpa_supplicant.conf` on the SD card.
+
+4. **If ping works but SSH says "Connection refused":**
+   ```bash
+   # SSH isn't running on the Pi. This usually means it wasn't enabled during flashing.
+   ```
+   Re-flash the SD card and make sure you checked "Enable SSH" in the Raspberry Pi Imager settings (Step 1).
+
+5. **If SSH says "WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED":**
+   ```bash
+   # This happens if you re-flashed the Pi or its IP was reused by another device.
+   # Remove the old saved fingerprint so SSH will accept the new one:
+   ssh-keygen -R poolcontroller.local
+   ```
+   Then try `ssh pi@poolcontroller.local` again.
+
+6. **On Windows and `.local` addresses don't work:**
+   - Older Windows versions need [Bonjour](https://support.apple.com/kb/DL999) installed for `.local` name resolution (or just use the IP address directly).
+   - If using PowerShell and SSH isn't recognized, make sure OpenSSH is installed: Settings → Apps → Optional Features → OpenSSH Client.
 
 ### "The bridge starts but shows no data"
 - The most common cause is swapped A/B wires. Try swapping the yellow and black wires at the MAX485 module.
