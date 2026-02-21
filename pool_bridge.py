@@ -144,7 +144,7 @@ class PoolHandler(BaseHTTPRequestHandler):
                         self.wfile.write(f'data: {data}\n\n'.encode())
                         self.wfile.flush()
                     time.sleep(0.5)
-            except (BrokenPipeError, ConnectionResetError):
+            except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
 
         elif self.path == '/health':
@@ -154,7 +154,17 @@ class PoolHandler(BaseHTTPRequestHandler):
             self._json_response({'error': 'not found'}, 404)
 
     def do_PUT(self):
-        content_len = int(self.headers.get('Content-Length', 0))
+        # Validate Content-Length
+        raw_len = self.headers.get('Content-Length', '0')
+        try:
+            content_len = int(raw_len)
+        except (ValueError, TypeError):
+            self._json_response({'error': 'invalid Content-Length'}, 400)
+            return
+        if content_len < 0 or content_len > 4096:
+            self._json_response({'error': 'Content-Length out of range'}, 400)
+            return
+
         body = self.rfile.read(content_len)
         try:
             data = json.loads(body) if body else {}
@@ -164,7 +174,14 @@ class PoolHandler(BaseHTTPRequestHandler):
 
         if self.path == '/state/circuit/setState':
             circuit_name = data.get('circuit', '').upper()
-            desired = data.get('state', True)
+            desired = data.get('state', None)
+
+            # Strict boolean check — reject strings, ints, etc.
+            if not isinstance(desired, bool):
+                self._json_response({
+                    'error': 'state must be a boolean (true/false)',
+                }, 400)
+                return
 
             if circuit_name not in CIRCUIT_MAP:
                 self._json_response({
@@ -178,7 +195,7 @@ class PoolHandler(BaseHTTPRequestHandler):
                 return
 
             try:
-                result = panel.set_state(CIRCUIT_MAP[circuit_name], bool(desired))
+                result = panel.set_state(CIRCUIT_MAP[circuit_name], desired)
                 self._json_response({'ok': result, 'circuit': circuit_name, 'state': desired})
             except Exception as e:
                 log.error('set_state error: %s', e)
