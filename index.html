@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Pool Control</title>
+<style>
+  :root {
+    --bg: #0a0f1e;
+    --card: #111827;
+    --card2: #1a2235;
+    --border: #1e3a5f;
+    --accent: #0ea5e9;
+    --accent2: #06b6d4;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --on: #22c55e;
+    --off: #334155;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0 0 80px 0;
+  }
+
+  header {
+    background: linear-gradient(135deg, #0c1a33 0%, #0a0f1e 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .logo h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  .logo span { font-size: 11px; color: var(--muted); display: block; margin-top: -2px; }
+
+  .status-pill { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid; cursor: pointer; transition: all 0.2s; }
+  .status-pill.connected { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.3); color: var(--green); }
+  .status-pill.disconnected { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: var(--red); }
+  .status-pill.demo { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); color: var(--yellow); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .status-dot.pulse { animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .temp-bar { display: flex; gap: 1px; padding: 0 16px; margin: 12px 0 0; }
+  .temp-card { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; text-align: center; transition: all 0.3s; margin: 0 4px; }
+  .temp-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 4px; }
+  .temp-value { font-size: 26px; font-weight: 700; letter-spacing: -1px; }
+  .temp-value.air { color: #94a3b8; }
+  .temp-value.pool { color: var(--accent); }
+  .temp-value.spa { color: #f472b6; }
+  .temp-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  .section { padding: 20px 16px 4px; }
+  .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 10px; padding-left: 2px; }
+
+  .circuit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .circuit-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px 14px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .circuit-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, transparent 60%, rgba(14,165,233,0.05)); pointer-events: none; }
+  .circuit-card:active { transform: scale(0.97); }
+  .circuit-card.on { border-color: rgba(34,197,94,0.4); background: linear-gradient(135deg, #111827 0%, #0d1f12 100%); box-shadow: 0 0 20px rgba(34,197,94,0.08), inset 0 1px 0 rgba(34,197,94,0.1); }
+  .circuit-card.on::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--green), transparent); border-radius: 14px 14px 0 0; }
+  .circuit-card.active-mode { border-color: rgba(14,165,233,0.5); background: linear-gradient(135deg, #111827 0%, #0c1a2e 100%); box-shadow: 0 0 20px rgba(14,165,233,0.1), inset 0 1px 0 rgba(14,165,233,0.1); }
+  .circuit-card.active-mode::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), transparent); border-radius: 14px 14px 0 0; }
+  .circuit-icon { font-size: 22px; margin-bottom: 8px; }
+  .circuit-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .circuit-status { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .circuit-status.on { color: var(--green); }
+  .circuit-status.off { color: var(--muted); }
+
+  .toggle-switch { position: absolute; top: 14px; right: 14px; width: 34px; height: 20px; background: var(--off); border-radius: 10px; transition: background 0.2s; flex-shrink: 0; }
+  .toggle-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; background: white; border-radius: 50%; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+  .circuit-card.on .toggle-switch { background: var(--on); }
+  .circuit-card.on .toggle-switch::after { transform: translateX(14px); }
+  .circuit-card.active-mode .toggle-switch { background: var(--accent); }
+  .circuit-card.active-mode .toggle-switch::after { transform: translateX(14px); }
+
+  .mode-row { display: flex; gap: 8px; }
+  .mode-btn { flex: 1; padding: 14px 8px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; -webkit-tap-highlight-color: transparent; }
+  .mode-btn .mode-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+  .mode-btn:active { transform: scale(0.97); }
+  .mode-btn.active { border-color: rgba(14,165,233,0.5); background: linear-gradient(135deg, #0c1a2e, #111827); color: var(--accent); box-shadow: 0 0 15px rgba(14,165,233,0.1); }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .modal-overlay.show { opacity: 1; pointer-events: all; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 24px; width: 100%; max-width: 380px; transform: translateY(20px); transition: transform 0.2s; }
+  .modal-overlay.show .modal { transform: translateY(0); }
+  .modal h2 { font-size: 18px; margin-bottom: 6px; }
+  .modal p { color: var(--muted); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+  .input-group { margin-bottom: 14px; }
+  .input-group label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 6px; }
+  .input-group input { width: 100%; background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-size: 15px; outline: none; transition: border-color 0.2s; }
+  .input-group input:focus { border-color: var(--accent); }
+  .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
+  .btn { flex: 1; padding: 13px; border-radius: 12px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-secondary { background: var(--card2); border: 1px solid var(--border); color: var(--text); }
+  .btn:active { transform: scale(0.97); }
+
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--card2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 20px; font-size: 13px; font-weight: 500; z-index: 300; transition: transform 0.3s; white-space: nowrap; box-shadow: 0 10px 40px rgba(0,0,0,0.4); }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: rgba(34,197,94,0.4); color: var(--green); }
+  .toast.error { border-color: rgba(239,68,68,0.4); color: var(--red); }
+  .toast.info { border-color: rgba(14,165,233,0.3); color: var(--accent); }
+
+  .schedule-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; }
+  .schedule-info { font-size: 13px; }
+  .schedule-info strong { display: block; margin-bottom: 2px; }
+  .schedule-info span { color: var(--muted); font-size: 12px; }
+  .schedule-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 8px; }
+  .schedule-badge.active { background: rgba(34,197,94,0.1); color: var(--green); }
+  .schedule-badge.inactive { background: rgba(100,116,139,0.1); color: var(--muted); }
+
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(17,24,39,0.95); backdrop-filter: blur(10px); border-top: 1px solid var(--border); display: flex; padding: 8px 0 env(safe-area-inset-bottom, 8px); z-index: 100; }
+  .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: all 0.2s; }
+  .nav-btn .nav-icon { font-size: 22px; transition: transform 0.2s; }
+  .nav-btn .nav-label { font-size: 10px; color: var(--muted); font-weight: 500; }
+  .nav-btn.active .nav-label { color: var(--accent); }
+  .nav-btn.active .nav-icon { transform: scale(1.15); }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .heater-panel { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+  .heater-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .heater-row h3 { font-size: 15px; }
+
+  .guide-hero { margin: 16px 16px 0; background: linear-gradient(135deg, #0c1a33 0%, #0d1f12 100%); border: 1px solid var(--border); border-radius: 16px; padding: 20px; position: relative; overflow: hidden; }
+  .guide-hero::after { content: '📖'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 44px; opacity: 0.15; }
+  .guide-hero h2 { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+  .guide-hero p { font-size: 12px; color: var(--muted); line-height: 1.5; max-width: 230px; }
+  .guide-badges { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .guide-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 8px; background: rgba(14,165,233,0.12); border: 1px solid rgba(14,165,233,0.25); color: var(--accent); }
+
+  .guide-accordion { margin: 10px 16px 0; border-radius: 14px; border: 1px solid var(--border); overflow: hidden; }
+  .accordion-item { border-bottom: 1px solid var(--border); }
+  .accordion-item:last-child { border-bottom: none; }
+  .accordion-header { display: flex; align-items: center; padding: 15px 16px; cursor: pointer; background: var(--card); transition: background 0.15s; gap: 12px; -webkit-tap-highlight-color: transparent; user-select: none; }
+  .accordion-header:active { background: var(--card2); }
+  .accordion-num { width: 26px; height: 26px; border-radius: 8px; background: rgba(14,165,233,0.12); border: 1px solid rgba(14,165,233,0.25); color: var(--accent); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .accordion-num.done { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.25); color: var(--green); }
+  .accordion-title { flex: 1; }
+  .accordion-title strong { font-size: 14px; display: block; margin-bottom: 1px; }
+  .accordion-title span { font-size: 11px; color: var(--muted); }
+  .accordion-arrow { color: var(--muted); font-size: 13px; transition: transform 0.2s; }
+  .accordion-item.open .accordion-arrow { transform: rotate(90deg); }
+  .accordion-body { display: none; background: var(--card2); padding: 0 16px 16px; border-top: 1px solid var(--border); }
+  .accordion-item.open .accordion-body { display: block; }
+
+  .guide-step { padding: 12px 0; border-bottom: 1px solid rgba(30,58,95,0.5); font-size: 13px; line-height: 1.6; color: #cbd5e1; }
+  .guide-step:last-child { border-bottom: none; padding-bottom: 0; }
+  .guide-step h4 { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid rgba(30,58,95,0.5); }
+  .guide-code { background: #0a0f1e; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11.5px; color: #7dd3fc; line-height: 1.7; margin: 8px 0 4px; overflow-x: auto; white-space: pre; }
+  .guide-warning { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #fcd34d; margin: 8px 0; line-height: 1.5; }
+  .guide-tip { background: rgba(14,165,233,0.08); border: 1px solid rgba(14,165,233,0.2); border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #7dd3fc; margin: 8px 0; line-height: 1.5; }
+
+  .parts-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+  .parts-table th { text-align: left; padding: 7px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .parts-table td { padding: 8px; border-bottom: 1px solid rgba(30,58,95,0.4); vertical-align: top; }
+  .parts-table tr:last-child td { border-bottom: none; }
+  .parts-table .price { color: var(--green); font-weight: 600; white-space: nowrap; }
+
+  .wiring-diagram { background: #0a0f1e; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: 'SF Mono', monospace; font-size: 10.5px; color: #94a3b8; line-height: 1.8; overflow-x: auto; white-space: pre; margin: 8px 0; }
+
+  .progress-bar-wrap { background: var(--card2); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 10px 16px 0; }
+  .progress-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .progress-track { height: 6px; background: var(--off); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 3px; transition: width 0.4s ease; }
+  .progress-steps { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .progress-step-dot { font-size: 11px; padding: 3px 8px; border-radius: 6px; cursor: pointer; background: var(--card); border: 1px solid var(--border); color: var(--muted); transition: all 0.2s; }
+  .progress-step-dot.done { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.3); color: var(--green); }
+
+  .substep { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(30,58,95,0.4); align-items: flex-start; }
+  .substep:last-child { border-bottom: none; padding-bottom: 0; }
+  .substep-num { width: 24px; height: 24px; border-radius: 50%; background: rgba(14,165,233,0.15); border: 1px solid rgba(14,165,233,0.3); color: var(--accent); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .substep-body { flex: 1; font-size: 13px; color: #cbd5e1; line-height: 1.65; }
+  .substep-body strong { color: var(--text); }
+  .see-box { background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.2); border-left: 3px solid var(--green); border-radius: 0 8px 8px 0; padding: 10px 12px; margin: 8px 0 0; font-size: 12px; color: #86efac; line-height: 1.6; }
+  .see-box strong { color: var(--green); display: block; margin-bottom: 3px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .note-box { background: rgba(14,165,233,0.07); border: 1px solid rgba(14,165,233,0.2); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 10px 12px; margin: 8px 0 0; font-size: 12px; color: #7dd3fc; line-height: 1.6; }
+  .note-box strong { color: var(--accent); display: block; margin-bottom: 3px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .physical-box { background: rgba(245,158,11,0.07); border: 1px solid rgba(245,158,11,0.25); border-left: 3px solid var(--yellow); border-radius: 0 8px 8px 0; padding: 10px 12px; margin: 8px 0 0; font-size: 12px; color: #fcd34d; line-height: 1.6; }
+  .physical-box strong { color: var(--yellow); display: block; margin-bottom: 3px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .file-path-badge { display: inline-block; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; color: #c084fc; word-break: break-all; }
+
+  .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; cursor: pointer; }
+  .settings-row h4 { font-size: 14px; margin-bottom: 2px; }
+  .settings-row p { font-size: 12px; color: var(--muted); }
+  .connection-status-detail { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  .conn-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .conn-row:last-child { border-bottom: none; }
+  .conn-val { color: var(--muted); }
+
+  .api-table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 8px 0; }
+  .api-table th { text-align: left; padding: 6px 8px; color: var(--muted); font-size: 10px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .api-table td { padding: 8px; border-bottom: 1px solid rgba(30,58,95,0.35); vertical-align: top; }
+  .api-table tr:last-child td { border-bottom: none; }
+  .api-method { font-family: monospace; background: rgba(14,165,233,0.1); color: var(--accent); padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🏊</div>
+    <div>
+      <h1>Pool Control</h1>
+      <span>Hayward AquaLogic</span>
+    </div>
+  </div>
+  <div class="status-pill disconnected" id="statusPill" onclick="showConnModal()">
+    <div class="status-dot pulse" id="statusDot"></div>
+    <span id="statusText">Demo Mode</span>
+  </div>
+</header>
+
+<!-- PAGES -->
+<div id="page-home" class="page active">
+  <div class="temp-bar">
+    <div class="temp-card">
+      <div class="temp-label">Air</div>
+      <div class="temp-value air" id="tempAir">--°</div>
+      <div class="temp-sub">Ambient</div>
+    </div>
+    <div class="temp-card">
+      <div class="temp-label">Pool</div>
+      <div class="temp-value pool" id="tempPool">--°</div>
+      <div class="temp-sub" id="poolSub">Waiting…</div>
+    </div>
+    <div class="temp-card">
+      <div class="temp-label">Spa</div>
+      <div class="temp-value spa" id="tempSpa">--°</div>
+      <div class="temp-sub" id="spaSub">Waiting…</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Mode</div>
+    <div class="mode-row">
+      <div class="mode-btn" id="mode-off" onclick="setMode('off')"><span class="mode-icon">⏻</span>Off</div>
+      <div class="mode-btn" id="mode-pool" onclick="setMode('pool')"><span class="mode-icon">🏊</span>Pool</div>
+      <div class="mode-btn" id="mode-spa" onclick="setMode('spa')"><span class="mode-icon">♨️</span>Spa</div>
+      <div class="mode-btn" id="mode-spillover" onclick="setMode('spillover')"><span class="mode-icon">🌊</span>Spillover</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Equipment</div>
+    <div class="circuit-grid">
+      <div class="circuit-card" id="card-FILTER" onclick="toggleCircuit('FILTER')">
+        <div class="toggle-switch"></div>
+        <div class="circuit-icon">⚙️</div>
+        <div class="circuit-name">Filter Pump</div>
+        <div class="circuit-status off" id="status-FILTER">Off</div>
+      </div>
+      <div class="circuit-card" id="card-LIGHTS" onclick="toggleCircuit('LIGHTS')">
+        <div class="toggle-switch"></div>
+        <div class="circuit-icon">💡</div>
+        <div class="circuit-name">Lights</div>
+        <div class="circuit-status off" id="status-LIGHTS">Off</div>
+      </div>
+      <div class="circuit-card" id="card-HEATER_1" onclick="toggleCircuit('HEATER_1')">
+        <div class="toggle-switch"></div>
+        <div class="circuit-icon">🔥</div>
+        <div class="circuit-name">Heater</div>
+        <div class="circuit-status off" id="status-HEATER_1">Off</div>
+      </div>
+      <div class="circuit-card" id="card-VALVE_4" onclick="toggleCircuit('VALVE_4')">
+        <div class="toggle-switch"></div>
+        <div class="circuit-icon">🚰</div>
+        <div class="circuit-name">Valve 4</div>
+        <div class="circuit-status off" id="status-VALVE_4">Off</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Auxiliary</div>
+    <div class="circuit-grid">
+      <div class="circuit-card" id="card-AUX_1" onclick="toggleCircuit('AUX_1')">
+        <div class="toggle-switch"></div>
+        <div class="circuit-icon">🌬️</div>
+        <div class="circuit-name">AUX 1</div>
+        <div class="circuit-status off" id="status-AUX_1">Off</div>
+      </div>
+      <div class="circuit-card" id="card-AUX_2" onclick="toggleCircuit('AUX_2')">
+        <div class="toggle-switch"></div>
+        <div class="circuit-icon">💦</div>
+        <div class="circuit-name">AUX 2</div>
+        <div class="circuit-status off" id="status-AUX_2">Off</div>
+      </div>
+      <div class="circuit-card" id="card-AUX_3" onclick="toggleCircuit('AUX_3')">
+        <div class="toggle-switch"></div>
+        <div class="circuit-icon">🔌</div>
+        <div class="circuit-name">AUX 3</div>
+        <div class="circuit-status off" id="status-AUX_3">Off</div>
+      </div>
+      <div class="circuit-card" id="card-AUX_4" onclick="toggleCircuit('AUX_4')">
+        <div class="toggle-switch"></div>
+        <div class="circuit-icon">🔆</div>
+        <div class="circuit-name">AUX 4</div>
+        <div class="circuit-status off" id="status-AUX_4">Off</div>
+      </div>
+      <div class="circuit-card" id="card-AUX_5" onclick="toggleCircuit('AUX_5')">
+        <div class="toggle-switch"></div>
+        <div class="circuit-icon">🔌</div>
+        <div class="circuit-name">AUX 5</div>
+        <div class="circuit-status off" id="status-AUX_5">Off</div>
+      </div>
+      <div class="circuit-card" id="card-AUX_6" onclick="toggleCircuit('AUX_6')">
+        <div class="toggle-switch"></div>
+        <div class="circuit-icon">🔌</div>
+        <div class="circuit-name">AUX 6</div>
+        <div class="circuit-status off" id="status-AUX_6">Off</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SENSORS PAGE -->
+<div id="page-sensors" class="page">
+  <div class="section">
+    <div class="section-title">Live Readings</div>
+    <div class="heater-panel">
+      <div class="heater-row"><div><h3>Air Temperature</h3></div><div id="sens-air" style="font-size:22px;font-weight:700">--°F</div></div>
+      <div class="heater-row"><div><h3>Pool Temperature</h3></div><div id="sens-pool" style="font-size:22px;font-weight:700;color:var(--accent)">--°F</div></div>
+      <div class="heater-row"><div><h3>Spa Temperature</h3></div><div id="sens-spa" style="font-size:22px;font-weight:700;color:#f472b6">--°F</div></div>
+      <div class="heater-row"><div><h3>Salt Level</h3></div><div id="sens-salt" style="font-size:22px;font-weight:700;color:var(--green)">-- PPM</div></div>
+      <div class="heater-row"><div><h3>Pool Chlorinator</h3></div><div id="sens-pchlor" style="font-size:22px;font-weight:700">--%</div></div>
+      <div class="heater-row"><div><h3>Spa Chlorinator</h3></div><div id="sens-schlor" style="font-size:22px;font-weight:700">--%</div></div>
+      <div class="heater-row"><div><h3>Pump Speed</h3></div><div id="sens-pspeed" style="font-size:22px;font-weight:700">--%</div></div>
+      <div class="heater-row" style="margin-bottom:0"><div><h3>Pump Power</h3></div><div id="sens-ppower" style="font-size:22px;font-weight:700">-- W</div></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">System Status</div>
+    <div class="heater-panel">
+      <div class="heater-row"><div><h3>Heater</h3></div><div id="sens-heater" style="font-size:14px;font-weight:600;color:var(--muted)">--</div></div>
+      <div class="heater-row" style="margin-bottom:0"><div><h3>Check System</h3></div><div id="sens-checksys" style="font-size:14px;font-weight:600;color:var(--muted)">None</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETUP GUIDE PAGE -->
+<div id="page-setup" class="page">
+  <div class="guide-hero">
+    <h2>Setup Guide</h2>
+    <p>Complete walkthrough: Hayward AquaLogic → Raspberry Pi → phone control.</p>
+    <div class="guide-badges">
+      <span class="guide-badge">~$41 hardware</span>
+      <span class="guide-badge">2–4 hrs</span>
+      <span class="guide-badge">Hayward AquaLogic</span>
+    </div>
+  </div>
+
+  <div class="progress-bar-wrap">
+    <div class="progress-label"><span>Your Progress</span><span id="progress-pct">0 of 6 complete</span></div>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    <div class="progress-steps" id="progress-steps"></div>
+  </div>
+
+  <div class="guide-accordion">
+
+    <!-- STEP 1: HARDWARE -->
+    <div class="accordion-item" id="acc-1">
+      <div class="accordion-header" onclick="toggleAccordion(1)">
+        <div class="accordion-num" id="acc-num-1">1</div>
+        <div class="accordion-title"><strong>Hardware Shopping List</strong><span>~$41 total · Order everything first</span></div>
+        <span class="accordion-arrow">›</span>
+      </div>
+      <div class="accordion-body">
+        <table class="parts-table">
+          <tr><th>Item</th><th>Where</th><th>Cost</th></tr>
+          <tr><td>Raspberry Pi Zero 2W</td><td>raspberrypi.com, Amazon</td><td class="price">$15</td></tr>
+          <tr><td>MicroSD card (16GB+)</td><td>Amazon</td><td class="price">$8</td></tr>
+          <tr><td>MAX485 TTL-to-RS-485 module</td><td>Amazon, AliExpress</td><td class="price">$3</td></tr>
+          <tr><td>USB-C 5V 2.5A power supply</td><td>Amazon</td><td class="price">$10</td></tr>
+          <tr><td>Female-to-Female jumper wires (6+)</td><td>Amazon</td><td class="price">$5</td></tr>
+        </table>
+        <div class="guide-tip">💡 The Pi Zero 2W has built-in WiFi, draws ~0.5W idle, and is small enough to mount inside or beside the AquaLogic enclosure.</div>
+        <div class="note-box"><strong>Alternative: Elfin EW11</strong>If you don't want to use a Pi, an Elfin EW11 RS-485-to-WiFi module (~$20) can replace both the Pi and MAX485 — but you'll need a separate machine to run the bridge software. The Pi approach keeps everything self-contained.</div>
+      </div>
+    </div>
+
+    <!-- STEP 2: WIRING -->
+    <div class="accordion-item" id="acc-2">
+      <div class="accordion-header" onclick="toggleAccordion(2)">
+        <div class="accordion-num" id="acc-num-2">2</div>
+        <div class="accordion-title"><strong>Wiring the RS-485 Bus</strong><span>MAX485 module → AquaLogic REMOTE DISPLAY port</span></div>
+        <span class="accordion-arrow">›</span>
+      </div>
+      <div class="accordion-body">
+        <div class="guide-step">
+          <h4>Use the REMOTE DISPLAY port — leave everything else alone</h4>
+          Your AquaLogic board (007-243-01) has a <strong>REMOTE DISPLAY</strong> port at the top-left of the PCB. It's a 4-pin connector that is currently empty. This is your tap point. Do not disturb any existing wires, the LOCAL DISPLAY ribbon cable, or any relay connections.
+          <div class="guide-warning">⚠️ ONLY use the empty REMOTE DISPLAY port. Do NOT unplug or modify any existing connections.</div>
+        </div>
+        <div class="guide-step">
+          <h4>REMOTE DISPLAY port pinout (printed on your board)</h4>
+          <div class="wiring-diagram">REMOTE DISPLAY Port       Function
+─────────────────────────────────────────
+Pin 1  RED               +12V  ← DO NOT USE
+Pin 2  BLK               DATA− (RS-485 B)
+Pin 3  YEL               DATA+ (RS-485 A)
+Pin 4  GRN               GND</div>
+        </div>
+        <div class="guide-step">
+          <h4>MAX485 module → Raspberry Pi Zero 2W wiring</h4>
+          <div class="wiring-diagram">MAX485 Pin    →   Connection
+─────────────────────────────────────────────
+A  (DATA+)    →   REMOTE DISPLAY Pin 3 (YEL)
+B  (DATA−)    →   REMOTE DISPLAY Pin 2 (BLK)
+GND           →   REMOTE DISPLAY Pin 4 (GRN)
+VCC           →   Pi 3.3V   (GPIO Pin 1)
+GND           →   Pi GND    (GPIO Pin 6)
+DI  (TX)      →   Pi GPIO14 (GPIO Pin 8)
+DE            →   Pi GPIO18 (GPIO Pin 12)
+RE            →   Pi GND    (GPIO Pin 6)
+RO  (RX)      →   Pi GPIO15 (GPIO Pin 10)</div>
+          <div class="note-box"><strong>Why RE → GND</strong>RE (Receive Enable) is active-low. Wiring it to GND keeps the receiver permanently on, so the Pi always hears bus traffic. DE on GPIO18 lets software control when to transmit. This is the standard configuration for the aqualogic Python library.</div>
+          <div class="guide-warning">⚠️ The AquaLogic RS-485 bus runs at 19200 baud with 2 stop bits. The aqualogic library handles this automatically — do not change baud rate settings.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: PI SETUP -->
+    <div class="accordion-item" id="acc-3">
+      <div class="accordion-header" onclick="toggleAccordion(3)">
+        <div class="accordion-num" id="acc-num-3">3</div>
+        <div class="accordion-title"><strong>Set Up the Raspberry Pi</strong><span>Flash SD card · WiFi · enable serial port</span></div>
+        <span class="accordion-arrow">›</span>
+      </div>
+      <div class="accordion-body">
+        <div class="guide-step">
+          <h4>3A — Flash the SD card with Raspberry Pi Imager</h4>
+          <div class="substep"><div class="substep-num">1</div><div class="substep-body">Download <strong>Raspberry Pi Imager</strong> from <strong>raspberrypi.com/software</strong> on your laptop.</div></div>
+          <div class="substep"><div class="substep-num">2</div><div class="substep-body">Insert the MicroSD card into your computer.</div></div>
+          <div class="substep"><div class="substep-num">3</div><div class="substep-body">In the Imager: <strong>Choose Device</strong> → Raspberry Pi Zero 2 W. <strong>Choose OS</strong> → Raspberry Pi OS (other) → <strong>Raspberry Pi OS Lite (64-bit)</strong>. <strong>Choose Storage</strong> → your SD card.</div></div>
+          <div class="substep"><div class="substep-num">4</div><div class="substep-body">Click <strong>Next</strong>, then <strong>Edit Settings</strong>. Set hostname to <span class="file-path-badge">poolcontroller</span>, set username/password (write it down!), enter your WiFi name and password, and under the Services tab enable SSH.</div></div>
+          <div class="substep"><div class="substep-num">5</div><div class="substep-body">Click <strong>Save → Yes → Yes</strong>. Wait for write to complete, eject card, insert into Pi, plug in power. Wait 90 seconds for first boot.</div></div>
+        </div>
+        <div class="guide-step">
+          <h4>3B — SSH into the Pi</h4>
+          <div class="substep"><div class="substep-num">1</div><div class="substep-body">Open Terminal (Mac) or PowerShell (Windows). Run:
+            <div class="guide-code">ssh pi@poolcontroller.local</div></div></div>
+          <div class="substep"><div class="substep-num">2</div><div class="substep-body">Type <strong>yes</strong> to accept the key, then enter your password. You won't see characters as you type — that's normal.</div></div>
+          <div class="see-box"><strong>✓ Done when you see</strong>A prompt like: <span style="font-family:monospace;color:#86efac">pi@poolcontroller:~ $</span></div>
+        </div>
+        <div class="guide-step">
+          <h4>3C — Enable the serial port</h4>
+          <div class="substep"><div class="substep-num">1</div><div class="substep-body">Run: <div class="guide-code">sudo raspi-config</div> Navigate to <strong>Interface Options → Serial Port</strong>. Answer <strong>No</strong> to login shell, <strong>Yes</strong> to hardware serial. Finish and reboot.</div></div>
+          <div class="substep"><div class="substep-num">2</div><div class="substep-body">After reboot, reconnect SSH. Then run:
+            <div class="guide-code">sudo nano /boot/firmware/config.txt</div>Add these lines at the very end:
+            <div class="guide-code">enable_uart=1
+dtoverlay=disable-bt</div>Save with Ctrl+X → Y → Enter. Reboot: <div class="guide-code">sudo reboot</div></div></div>
+          <div class="see-box"><strong>✓ Confirm it worked</strong><div class="guide-code" style="margin-top:6px">ls /dev/ttyAMA0</div>Should print: <span style="font-family:monospace;color:#86efac">/dev/ttyAMA0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4: INSTALL BRIDGE -->
+    <div class="accordion-item" id="acc-4">
+      <div class="accordion-header" onclick="toggleAccordion(4)">
+        <div class="accordion-num" id="acc-num-4">4</div>
+        <div class="accordion-title"><strong>Install the Pool Bridge Software</strong><span>Python bridge that reads AquaLogic + serves the API</span></div>
+        <span class="accordion-arrow">›</span>
+      </div>
+      <div class="accordion-body">
+        <div class="guide-step">
+          <h4>4A — Install Python dependencies</h4>
+          <div class="guide-code">sudo apt update && sudo apt install -y python3-pip python3-serial
+pip3 install aqualogic --break-system-packages</div>
+          <div class="see-box"><strong>✓ Done when</strong>No red errors. You see "Successfully installed aqualogic".</div>
+        </div>
+        <div class="guide-step">
+          <h4>4B — Create the bridge program</h4>
+          <div class="substep"><div class="substep-num">1</div><div class="substep-body">Run: <div class="guide-code">nano /home/pi/pool_bridge.py</div></div></div>
+          <div class="substep"><div class="substep-num">2</div><div class="substep-body">Paste the entire bridge script (provided separately as <span class="file-path-badge">pool_bridge.py</span>). Save with Ctrl+X → Y → Enter.</div></div>
+        </div>
+        <div class="guide-step">
+          <h4>4C — Test the bridge</h4>
+          <div class="guide-code">python3 /home/pi/pool_bridge.py</div>
+          Within 30 seconds you should see temperature and state data logging. In a second SSH window, test the API:
+          <div class="guide-code">curl http://localhost:4200/state/all</div>
+          You should see JSON with your temperatures and circuit states. Press Ctrl+C to stop.
+          <div class="guide-warning">⚠️ If you see serial errors, double-check the wiring from Step 2. Most common issue: DATA+ and DATA− swapped on the MAX485.</div>
+        </div>
+        <div class="guide-step">
+          <h4>4D — Set up auto-start on boot</h4>
+          <div class="guide-code">sudo nano /etc/systemd/system/poolbridge.service</div>
+          Paste:
+          <div class="guide-code">[Unit]
+Description=Pool Bridge (AquaLogic)
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/usr/bin/python3 /home/pi/pool_bridge.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target</div>
+          Then:
+          <div class="guide-code">sudo systemctl daemon-reload
+sudo systemctl enable poolbridge
+sudo systemctl start poolbridge</div>
+          <div class="see-box"><strong>✓ Confirm</strong><div class="guide-code" style="margin-top:6px">sudo systemctl status poolbridge</div>Should show <span style="font-family:monospace;color:#86efac">Active: active (running)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 5: SERVE WEB APP -->
+    <div class="accordion-item" id="acc-5">
+      <div class="accordion-header" onclick="toggleAccordion(5)">
+        <div class="accordion-num" id="acc-num-5">5</div>
+        <div class="accordion-title"><strong>Put This App on the Pi</strong><span>So any device on your WiFi can open it</span></div>
+        <span class="accordion-arrow">›</span>
+      </div>
+      <div class="accordion-body">
+        <div class="guide-step">
+          <h4>5A — Install nginx</h4>
+          <div class="guide-code">sudo apt install -y nginx
+sudo mkdir -p /var/www/pool</div>
+        </div>
+        <div class="guide-step">
+          <h4>5B — Copy this app file to the Pi</h4>
+          <div class="physical-box"><strong>⚠️ Run from your laptop, not SSH</strong>Open a NEW Terminal/PowerShell on your computer.</div>
+          <strong>Mac:</strong>
+          <div class="guide-code">scp ~/Downloads/pool-controller-app.html pi@poolcontroller.local:/home/pi/index.html</div>
+          <strong>Windows (PowerShell):</strong>
+          <div class="guide-code">scp $env:USERPROFILE\Downloads\pool-controller-app.html pi@poolcontroller.local:/home/pi/index.html</div>
+          Then back in SSH:
+          <div class="guide-code">sudo cp /home/pi/index.html /var/www/pool/index.html</div>
+        </div>
+        <div class="guide-step">
+          <h4>5C — Configure nginx</h4>
+          <div class="guide-code">sudo nano /etc/nginx/sites-available/default</div>
+          Delete everything (hold Ctrl+K) and paste:
+          <div class="guide-code">server {
+    listen 80;
+    root /var/www/pool;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /state/ {
+        proxy_pass http://localhost:4200;
+    }
+
+    location /events {
+        proxy_pass http://localhost:4200;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_set_header Connection '';
+        proxy_http_version 1.1;
+        chunked_transfer_encoding off;
+    }
+
+    location /health {
+        proxy_pass http://localhost:4200;
+    }
+}</div>
+          <div class="guide-code">sudo systemctl restart nginx</div>
+        </div>
+        <div class="guide-step">
+          <h4>5D — Open on your phone</h4>
+          <div class="substep"><div class="substep-num">1</div><div class="substep-body">Same WiFi as Pi. Open browser to: <div class="guide-code">http://poolcontroller.local</div></div></div>
+          <div class="substep"><div class="substep-num">2</div><div class="substep-body">Tap the <strong>Demo Mode</strong> badge → enter Pi's IP and port 4200 → Connect.</div></div>
+          <div class="see-box"><strong>✓ Done when</strong>Badge turns green "Live" — you're controlling your pool from your phone. 🎉</div>
+          <div class="guide-tip">💡 On iPhone: Share icon → "Add to Home Screen" for an app-like icon.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 6: REMOTE ACCESS -->
+    <div class="accordion-item" id="acc-6">
+      <div class="accordion-header" onclick="toggleAccordion(6)">
+        <div class="accordion-num" id="acc-num-6">6</div>
+        <div class="accordion-title"><strong>Remote Access via Tailscale</strong><span>Control from anywhere · free · 10 min</span></div>
+        <span class="accordion-arrow">›</span>
+      </div>
+      <div class="accordion-body">
+        <div class="guide-step">
+          <h4>Install Tailscale on the Pi</h4>
+          <div class="guide-code">curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up</div>
+          Follow the auth link. Then get your Tailscale IP:
+          <div class="guide-code">tailscale ip -4</div>
+        </div>
+        <div class="guide-step">
+          <h4>Install Tailscale on your phone</h4>
+          Download Tailscale from the App Store or Play Store. Sign in with the same account. Access your pool at:
+          <div class="guide-code">http://[TAILSCALE-IP]/</div>
+          <div class="guide-tip">💡 Tailscale is free for personal use (100 devices). No port forwarding needed.</div>
+        </div>
+        <div class="guide-step">
+          <h4>Troubleshooting</h4>
+          <div style="font-size:12px;color:var(--muted);line-height:2.2;padding:8px 0">
+            • No data → check A→YEL (Pin 3) and B→BLK (Pin 2) wiring<br>
+            • Garbled data → swap A and B wires on MAX485<br>
+            • RE not grounded → receiver won't enable<br>
+            • UART not found → check <code style="background:var(--card);padding:1px 4px;border-radius:3px">ls /dev/ttyAMA0</code><br>
+            • Bridge crashes → <code style="background:var(--card);padding:1px 4px;border-radius:3px">journalctl -u poolbridge -f</code><br>
+            • Can't reach Pi → <code style="background:var(--card);padding:1px 4px;border-radius:3px">sudo ufw allow 4200 && sudo ufw allow 80</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- API REFERENCE -->
+  <div class="section">
+    <div class="section-title">API Quick Reference</div>
+    <div class="guide-accordion" style="margin:0">
+      <div class="accordion-item" id="acc-api">
+        <div class="accordion-header" onclick="toggleAccordion('api')">
+          <div class="accordion-num" style="background:rgba(168,85,247,0.1);border-color:rgba(168,85,247,0.3);color:#c084fc">⚡</div>
+          <div class="accordion-title"><strong>AquaLogic Bridge REST API</strong><span>Port 4200 · http://[PI-IP]:4200</span></div>
+          <span class="accordion-arrow">›</span>
+        </div>
+        <div class="accordion-body">
+          <table class="api-table">
+            <tr><th>Endpoint</th><th>Method</th><th>Description</th></tr>
+            <tr><td>/state/all</td><td><span class="api-method">GET</span></td><td>Full state (temps, circuits, salt, pump)</td></tr>
+            <tr><td>/state/circuit/setState</td><td><span class="api-method">PUT</span></td><td>Toggle a circuit</td></tr>
+            <tr><td>/events</td><td><span class="api-method">SSE</span></td><td>Server-Sent Events — live state push</td></tr>
+            <tr><td>/health</td><td><span class="api-method">GET</span></td><td>Health check</td></tr>
+          </table>
+          <h4 style="font-size:12px;color:var(--muted);margin:12px 0 6px;text-transform:uppercase;letter-spacing:0.5px">Toggle a circuit</h4>
+          <div class="guide-code">curl -X PUT http://[PI-IP]:4200/state/circuit/setState \
+  -H "Content-Type: application/json" \
+  -d '{"circuit": "FILTER", "state": true}'</div>
+          <h4 style="font-size:12px;color:var(--muted);margin:12px 0 6px;text-transform:uppercase;letter-spacing:0.5px">Valid circuit names</h4>
+          <div class="guide-code">FILTER  POOL  SPA  SPILLOVER  LIGHTS
+HEATER_1  AUX_1  AUX_2  AUX_3  AUX_4
+AUX_5  AUX_6  VALVE_3  VALVE_4
+HEATER_AUTO_MODE  FILTER_LOW_SPEED</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS PAGE -->
+<div id="page-settings" class="page">
+  <div class="section">
+    <div class="section-title">Connection</div>
+    <div class="connection-status-detail">
+      <div class="conn-row"><span>Status</span><span class="conn-val" id="set-status">Demo Mode</span></div>
+      <div class="conn-row"><span>Host</span><span class="conn-val" id="set-host">Not configured</span></div>
+      <div class="conn-row"><span>Port</span><span class="conn-val" id="set-port">4200</span></div>
+      <div class="conn-row"><span>Protocol</span><span class="conn-val">REST + SSE</span></div>
+      <div class="conn-row"><span>Controller</span><span class="conn-val">Hayward AquaLogic</span></div>
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-bottom:10px" onclick="showConnModal()">Configure Connection</button>
+    <button class="btn btn-secondary" style="width:100%" onclick="reconnect()">Reconnect</button>
+  </div>
+  <div class="section">
+    <div class="section-title">About</div>
+    <div class="settings-row" style="cursor:default">
+      <div><h4>Pool Control App</h4><p>Hayward AquaLogic · aqualogic Python bridge</p></div>
+      <span style="color:var(--muted);font-size:12px">v2.0</span>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <div class="nav-btn active" id="nav-home" onclick="showPage('home')"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></div>
+  <div class="nav-btn" id="nav-sensors" onclick="showPage('sensors')"><span class="nav-icon">🌡️</span><span class="nav-label">Sensors</span></div>
+  <div class="nav-btn" id="nav-setup" onclick="showPage('setup')"><span class="nav-icon">📖</span><span class="nav-label">Setup</span></div>
+  <div class="nav-btn" id="nav-settings" onclick="showPage('settings')"><span class="nav-icon">⚙️</span><span class="nav-label">Settings</span></div>
+</nav>
+
+<!-- CONNECTION MODAL -->
+<div class="modal-overlay" id="connModal">
+  <div class="modal">
+    <h2>Connect to Controller</h2>
+    <p>Enter the IP address of your Raspberry Pi running the AquaLogic bridge.</p>
+    <div class="input-group">
+      <label>Raspberry Pi IP Address</label>
+      <input type="text" id="inp-host" placeholder="192.168.1.100" inputmode="decimal">
+    </div>
+    <div class="input-group">
+      <label>Port</label>
+      <input type="number" id="inp-port" placeholder="4200" value="4200" inputmode="numeric">
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="hideConnModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="connect()">Connect</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// STATE — Circuit names match AquaLogic States enum exactly
+// ============================================================
+const ALL_CIRCUITS = [
+  'FILTER','POOL','SPA','SPILLOVER','LIGHTS','HEATER_1',
+  'AUX_1','AUX_2','AUX_3','AUX_4','AUX_5','AUX_6',
+  'VALVE_3','VALVE_4','HEATER_AUTO_MODE','SUPER_CHLORINATE','FILTER_LOW_SPEED'
+];
+
+const state = {
+  connected: false,
+  demoMode: true,
+  host: '',
+  port: 4200,
+  sse: null,
+  circuits: {},
+  temps: { air: null, pool: null, spa: null },
+  salt: null,
+  poolChlor: null, spaChlor: null,
+  pumpSpeed: null, pumpPower: null,
+  isHeaterEnabled: false,
+  checkSystemMsg: null,
+};
+
+// Init circuits
+ALL_CIRCUITS.forEach(c => state.circuits[c] = false);
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+}
+
+// ============================================================
+// MODE (Pool/Spa toggle uses POOL and SPA states)
+// ============================================================
+function setMode(mode) {
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('mode-' + mode).classList.add('active');
+
+  if (state.demoMode) {
+    if (mode === 'pool') { updateCircuitUI('POOL', true); updateCircuitUI('SPA', false); updateCircuitUI('FILTER', true); }
+    else if (mode === 'spa') { updateCircuitUI('SPA', true); updateCircuitUI('POOL', false); updateCircuitUI('FILTER', true); }
+    else if (mode === 'spillover') { updateCircuitUI('SPILLOVER', true); updateCircuitUI('FILTER', true); }
+    else { updateCircuitUI('POOL', false); updateCircuitUI('SPA', false); updateCircuitUI('SPILLOVER', false); }
+    if (mode !== 'off') showToast(mode.charAt(0).toUpperCase() + mode.slice(1) + ' mode (demo)', 'success');
+    return;
+  }
+
+  // Real: toggle the appropriate state
+  if (mode === 'pool') apiToggle('POOL', true);
+  else if (mode === 'spa') apiToggle('SPA', true);
+  else if (mode === 'spillover') apiToggle('SPILLOVER', true);
+}
+
+// ============================================================
+// CIRCUITS
+// ============================================================
+function toggleCircuit(name) {
+  const newState = !state.circuits[name];
+
+  if (state.demoMode) {
+    updateCircuitUI(name, newState);
+    showToast(name + ' ' + (newState ? 'ON' : 'OFF'), newState ? 'success' : 'info');
+    return;
+  }
+
+  apiToggle(name, newState);
+}
+
+function updateCircuitUI(name, on) {
+  const card = document.getElementById('card-' + name);
+  const statusEl = document.getElementById('status-' + name);
+  if (card) {
+    card.classList.toggle('on', on);
+    if (statusEl) {
+      statusEl.textContent = on ? 'On' : 'Off';
+      statusEl.className = 'circuit-status ' + (on ? 'on' : 'off');
+    }
+  }
+  state.circuits[name] = on;
+}
+
+// ============================================================
+// TEMPERATURE + SENSOR DISPLAY
+// ============================================================
+function updateFromState(data) {
+  if (data.airTemp != null) {
+    state.temps.air = data.airTemp;
+    document.getElementById('tempAir').textContent = data.airTemp + '°';
+    document.getElementById('sens-air').textContent = data.airTemp + '°F';
+  }
+  if (data.poolTemp != null) {
+    state.temps.pool = data.poolTemp;
+    document.getElementById('tempPool').textContent = data.poolTemp + '°';
+    document.getElementById('poolSub').textContent = 'Live';
+    document.getElementById('sens-pool').textContent = data.poolTemp + '°F';
+  }
+  if (data.spaTemp != null) {
+    state.temps.spa = data.spaTemp;
+    document.getElementById('tempSpa').textContent = data.spaTemp + '°';
+    document.getElementById('spaSub').textContent = 'Live';
+    document.getElementById('sens-spa').textContent = data.spaTemp + '°F';
+  }
+  if (data.saltLevel != null) {
+    document.getElementById('sens-salt').textContent = data.saltLevel + (data.isMetric ? ' g/L' : ' PPM');
+  }
+  if (data.poolChlorinator != null) document.getElementById('sens-pchlor').textContent = data.poolChlorinator + '%';
+  if (data.spaChlorinator != null) document.getElementById('sens-schlor').textContent = data.spaChlorinator + '%';
+  if (data.pumpSpeed != null) document.getElementById('sens-pspeed').textContent = data.pumpSpeed + '%';
+  if (data.pumpPower != null) document.getElementById('sens-ppower').textContent = data.pumpPower + ' W';
+
+  document.getElementById('sens-heater').textContent = data.isHeaterEnabled ? 'Active' : 'Inactive';
+  document.getElementById('sens-heater').style.color = data.isHeaterEnabled ? 'var(--green)' : 'var(--muted)';
+  if (data.checkSystemMsg) {
+    document.getElementById('sens-checksys').textContent = data.checkSystemMsg;
+    document.getElementById('sens-checksys').style.color = 'var(--yellow)';
+  }
+
+  // Update circuit cards
+  if (data.circuits) {
+    Object.entries(data.circuits).forEach(([name, on]) => {
+      updateCircuitUI(name, on);
+    });
+
+    // Update mode buttons
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    if (data.circuits.POOL) document.getElementById('mode-pool').classList.add('active');
+    else if (data.circuits.SPA) document.getElementById('mode-spa').classList.add('active');
+    else if (data.circuits.SPILLOVER) document.getElementById('mode-spillover').classList.add('active');
+    else document.getElementById('mode-off').classList.add('active');
+  }
+}
+
+// ============================================================
+// CONNECTION — REST + SSE (Server-Sent Events)
+// ============================================================
+function connect() {
+  const host = document.getElementById('inp-host').value.trim();
+  const port = parseInt(document.getElementById('inp-port').value) || 4200;
+  if (!host) { showToast('Enter the Pi IP address', 'error'); return; }
+
+  state.host = host;
+  state.port = port;
+  state.demoMode = false;
+  hideConnModal();
+  setStatus('connecting');
+  showToast('Connecting to ' + host + '…', 'info');
+
+  fetch(`http://${host}:${port}/state/all`, { signal: AbortSignal.timeout(5000) })
+    .then(r => r.json())
+    .then(data => {
+      setStatus('connected');
+      updateFromState(data);
+      openSSE(host, port);
+    })
+    .catch(() => {
+      setStatus('disconnected');
+      showToast('Connection failed — check IP and bridge', 'error');
+      state.demoMode = true;
+    });
+
+  document.getElementById('set-host').textContent = host;
+  document.getElementById('set-port').textContent = port;
+}
+
+function openSSE(host, port) {
+  if (state.sse) { state.sse.close(); state.sse = null; }
+
+  const es = new EventSource(`http://${host}:${port}/events`);
+  state.sse = es;
+
+  es.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      updateFromState(data);
+    } catch(err) { console.error('SSE parse error', err); }
+  };
+
+  es.onerror = () => {
+    setStatus('disconnected');
+    es.close();
+    state.sse = null;
+    // Auto-reconnect
+    setTimeout(() => {
+      if (!state.demoMode && state.host) openSSE(state.host, state.port);
+    }, 5000);
+  };
+
+  es.onopen = () => setStatus('connected');
+}
+
+function reconnect() {
+  if (!state.host) { showConnModal(); return; }
+  if (state.sse) state.sse.close();
+  state.demoMode = false;
+  openSSE(state.host, state.port);
+  showToast('Reconnecting…', 'info');
+}
+
+// ============================================================
+// REST API — toggle circuit
+// ============================================================
+function apiToggle(circuit, desired) {
+  const url = `http://${state.host}:${state.port}/state/circuit/setState`;
+  fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ circuit: circuit, state: desired }),
+    signal: AbortSignal.timeout(4000),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) showToast(circuit + ' → ' + (desired ? 'ON' : 'OFF'), 'success');
+    else showToast('Command rejected', 'error');
+  })
+  .catch(() => showToast('Command failed — check connection', 'error'));
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function setStatus(s) {
+  const pill = document.getElementById('statusPill');
+  const dot  = document.getElementById('statusDot');
+  const txt  = document.getElementById('statusText');
+  pill.className = 'status-pill ' + (s === 'connected' ? 'connected' : s === 'connecting' ? 'demo' : 'disconnected');
+  dot.className  = 'status-dot' + (s === 'connecting' ? ' pulse' : '');
+  txt.textContent = s === 'connected' ? 'Live' : s === 'connecting' ? 'Connecting…' : state.demoMode ? 'Demo Mode' : 'Offline';
+  const setStat = document.getElementById('set-status');
+  if (setStat) setStat.textContent = txt.textContent;
+  state.connected = s === 'connected';
+}
+
+let toastTimer;
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (type || 'info');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function showConnModal() { document.getElementById('connModal').classList.add('show'); if (state.host) document.getElementById('inp-host').value = state.host; }
+function hideConnModal() { document.getElementById('connModal').classList.remove('show'); }
+
+// ============================================================
+// SETUP GUIDE — ACCORDION + PROGRESS
+// ============================================================
+const STEP_LABELS = ['Hardware', 'Wiring', 'Pi Setup', 'Bridge', 'Web App', 'Remote'];
+const completedSteps = new Set();
+
+function buildProgress() {
+  const el = document.getElementById('progress-steps');
+  el.innerHTML = STEP_LABELS.map((label, i) => {
+    const n = i + 1, done = completedSteps.has(n);
+    return `<div class="progress-step-dot ${done ? 'done' : ''}" onclick="toggleStep(${n})">${done ? '✓' : n} ${label}</div>`;
+  }).join('');
+  const pct = Math.round((completedSteps.size / 6) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = completedSteps.size + ' of 6 complete';
+  for (let n = 1; n <= 6; n++) {
+    const numEl = document.getElementById('acc-num-' + n);
+    if (numEl) { numEl.textContent = completedSteps.has(n) ? '✓' : n; numEl.classList.toggle('done', completedSteps.has(n)); }
+  }
+}
+function toggleStep(n) { completedSteps.has(n) ? completedSteps.delete(n) : completedSteps.add(n); buildProgress(); }
+function toggleAccordion(id) {
+  const item = document.getElementById('acc-' + id);
+  const wasOpen = item.classList.contains('open');
+  document.querySelectorAll('.accordion-item.open').forEach(el => el.classList.remove('open'));
+  if (!wasOpen) item.classList.add('open');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+  setStatus('demo');
+  document.getElementById('mode-off').classList.add('active');
+  buildProgress();
+
+  // Modal close on overlay click
+  document.getElementById('connModal').addEventListener('click', function(e) { if (e.target === this) hideConnModal(); });
+
+  // Demo temperature tick
+  (function demoTick() {
+    if (state.demoMode && state.temps.air === null) {
+      document.getElementById('tempAir').textContent = '72°';
+    }
+    setTimeout(demoTick, 30000);
+  })();
+});
+</script>
+</body>
+</html>

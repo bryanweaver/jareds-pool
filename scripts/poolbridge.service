@@ -1,0 +1,15 @@
+[Unit]
+Description=Pool Bridge (AquaLogic RS-485 → REST API)
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/usr/bin/python3 /home/pi/pool_bridge.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
