@@ -5,12 +5,14 @@ Control your Hayward AquaLogic pool from your phone. Filter, lights, heater, spa
 A Raspberry Pi sits in your pool equipment closet, wired to the AquaLogic board over RS-485. It runs a tiny Python program that reads temperatures, salt levels, and equipment status in real time — and lets you toggle everything on and off from any device on your WiFi.
 
 ```
-┌──────────────┐    RS-485     ┌───────────┐    WiFi / HTTP   ┌──────────┐
-│  AquaLogic   │◄────────────►│  Pi Zero   │◄───────────────►│  Phone / │
-│  Controller  │  wired to    │  + MAX485  │  poolcontroller  │  Browser │
-│              │  REMOTE       │  module    │  .local          │          │
-│              │  DISPLAY port │            │                  │          │
-└──────────────┘              └───────────┘                  └──────────┘
+┌──────────────┐    RS-485     ┌────────────┐    HTTP/SSE    ┌──────────┐
+│  AquaLogic   │◄─────────────►│  Pi Zero   │◄──────────────►│  Phone / │
+│  Controller  │  REMOTE       │  + MAX485  │  Port 4200     │  Browser │
+│  (007-243-01)│  DISPLAY      │            │                │          │
+└──────────────┘  port         └────────────┘                └──────────┘
+                                     │
+                                pool_bridge.py
+                                (aqualogic lib)
 ```
 
 **Total cost: ~$41.** About 30 minutes of hands-on time once you have the parts.
