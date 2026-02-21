@@ -108,7 +108,7 @@ The 4 pins have colored wires on the header (or labeled on the board):
    - **Windows:** PowerShell or Command Prompt
    - **Linux:** Any terminal
 
-3. Connect via SSH:
+3. Connect via SSH (this opens a remote terminal session on the Pi over your network):
    ```
    ssh pi@poolcontroller.local
    ```
@@ -129,7 +129,7 @@ The 4 pins have colored wires on the header (or labeled on the board):
 
 The Pi's serial port is turned off by default. You need to turn it on so it can talk to the MAX485 module.
 
-While SSH'd into the Pi:
+While SSH'd into the Pi, open the Pi's configuration tool:
 
 ```bash
 sudo raspi-config
@@ -148,16 +148,17 @@ Wait 30 seconds, then SSH back in:
 ssh pi@poolcontroller.local
 ```
 
-Now add two lines to the boot config to make sure UART stays on and Bluetooth doesn't interfere with it:
+Now add two lines to the Pi's boot configuration file. `enable_uart=1` makes sure UART stays enabled across reboots, and `dtoverlay=disable-bt` prevents the Pi's Bluetooth from claiming the serial port you need for RS-485:
 
 ```bash
+# Append two settings to the boot config file, then restart the Pi
 echo -e "enable_uart=1\ndtoverlay=disable-bt" | sudo tee -a /boot/firmware/config.txt
 sudo reboot
 ```
 
 Wait 30 seconds, SSH back in again.
 
-**To verify serial is working:**
+**To verify serial is working** (this checks if the serial port device file exists):
 ```bash
 ls /dev/ttyAMA0
 ```
@@ -174,20 +175,19 @@ You need to get the project files onto the Pi. Pick whichever method is easiest 
 SSH into the Pi and run:
 
 ```bash
-cd ~
-curl -L https://github.com/YOUR_USER/jareds-pool/archive/refs/heads/main.zip -o pool.zip
-sudo apt install -y unzip
-unzip pool.zip
-mv jareds-pool-main jareds-pool
+cd ~                        # Go to your home folder
+curl -L https://github.com/bryanweaver/jareds-pool/archive/refs/heads/main.zip -o pool.zip  # Download the project as a ZIP file
+sudo apt install -y unzip   # Install the unzip tool (if not already installed)
+unzip pool.zip              # Extract the ZIP file
+mv jareds-pool-main jareds-pool  # Rename the extracted folder to something shorter
 ```
-
-> **Replace `YOUR_USER`** with the actual GitHub username where this repo lives.
 
 ### Option B: Copy files from your computer
 
 If you downloaded the project as a ZIP on your computer (from the green "Code" button on GitHub → "Download ZIP"), unzip it, then from your computer's terminal:
 
 ```bash
+# Copy the project folder from your computer to the Pi over the network
 scp -r /path/to/jareds-pool pi@poolcontroller.local:~/jareds-pool
 ```
 
@@ -200,8 +200,8 @@ On Windows you can also use [WinSCP](https://winscp.net) — it's a drag-and-dro
 Now SSH into the Pi (if you aren't already) and run:
 
 ```bash
-cd ~/jareds-pool
-bash scripts/install.sh
+cd ~/jareds-pool          # Go into the project folder
+bash scripts/install.sh   # Run the installer script
 ```
 
 The installer does 5 things automatically:
@@ -224,27 +224,29 @@ It takes about 2-3 minutes on a Pi Zero.
 Run these two checks:
 
 ```bash
+# Ask the system if the pool bridge service is running
 sudo systemctl status poolbridge
 ```
 
 You should see **active (running)** in green. If it says "failed," check the logs:
 ```bash
+# Show the last 30 lines of the bridge's log output
 journalctl -u poolbridge -n 30
 ```
 
 Common issues:
 - **"No such file or directory: /dev/ttyAMA0"** — serial port isn't enabled. Go back to Step 4.
-- **"ModuleNotFoundError: No module named 'aqualogic'"** — the pip install didn't work. Run `pip3 install aqualogic --break-system-packages` manually.
-- **"Permission denied: /dev/ttyAMA0"** — add the `pi` user to the dialout group: `sudo usermod -aG dialout pi` then `sudo reboot`.
+- **"ModuleNotFoundError: No module named 'aqualogic'"** — the pip install didn't work. Install the Python library manually: `pip3 install aqualogic --break-system-packages`
+- **"Permission denied: /dev/ttyAMA0"** — the Pi user doesn't have permission to use the serial port. Grant access with `sudo usermod -aG dialout pi` (adds the `pi` user to the serial port group), then `sudo reboot`.
 
-Now test the API:
+Now test the API (this asks the bridge for all current pool data):
 ```bash
 curl http://localhost:4200/state/all
 ```
 
 If the wiring is correct, you'll see a JSON blob with temperatures, circuit states, salt levels, etc. If you see `{}` (empty), the bridge is running but hasn't received data from the controller yet — check your A/B wiring (try swapping them).
 
-Check nginx too:
+Check nginx too (the web server that serves the app to your browser):
 ```bash
 sudo systemctl status nginx
 ```
@@ -282,7 +284,9 @@ Right now this only works on your home WiFi. If you want to check pool temps or 
 
 On the Pi:
 ```bash
+# Download and run the Tailscale installer
 curl -fsSL https://tailscale.com/install.sh | sh
+# Start Tailscale and register this Pi with your account
 sudo tailscale up
 ```
 
@@ -298,23 +302,26 @@ Now you can reach your pool controller from anywhere using the Tailscale IP (som
 
 ### Useful Commands (via SSH)
 
-| What You Want | Command |
-|---------------|---------|
-| Check if the bridge is running | `sudo systemctl status poolbridge` |
-| View live bridge logs | `journalctl -u poolbridge -f` |
-| Restart the bridge | `sudo systemctl restart poolbridge` |
-| Restart nginx | `sudo systemctl restart nginx` |
-| Check the Pi's IP address | `hostname -I` |
-| Test the API manually | `curl http://localhost:4200/state/all` |
-| Reboot the Pi | `sudo reboot` |
+| What You Want | Command | What It Does |
+|---------------|---------|-------------|
+| Check if the bridge is running | `sudo systemctl status poolbridge` | Shows whether the pool bridge service is active or failed |
+| View live bridge logs | `journalctl -u poolbridge -f` | Streams log output in real time (press Ctrl+C to stop) |
+| Restart the bridge | `sudo systemctl restart poolbridge` | Stops and re-starts the pool bridge service |
+| Restart nginx | `sudo systemctl restart nginx` | Stops and re-starts the web server |
+| Check the Pi's IP address | `hostname -I` | Prints the Pi's current IP address on your network |
+| Test the API manually | `curl http://localhost:4200/state/all` | Fetches all pool data as JSON from the bridge |
+| Reboot the Pi | `sudo reboot` | Restarts the entire Pi (takes ~90 seconds to come back) |
 
 ### Toggle a Circuit from the Command Line
 
 ```bash
+# Send a command to the bridge to turn the filter pump on
 curl -X PUT http://localhost:4200/state/circuit/setState \
   -H "Content-Type: application/json" \
   -d '{"circuit": "FILTER", "state": true}'
 ```
+
+The `state` field must be a JSON boolean (`true` or `false`), not a string. `"state": "true"` will be rejected.
 
 Replace `FILTER` with any of these circuit names:
 ```
@@ -327,10 +334,28 @@ VALVE_3  VALVE_4  HEATER_AUTO_MODE  FILTER_LOW_SPEED  SUPER_CHLORINATE
 
 | Endpoint | Method | What It Does |
 |----------|--------|-------------|
-| `/state/all` | GET | Returns all pool data as JSON |
+| `/state/all` | GET | Returns all pool data as JSON (temps, salt, circuits, pump) |
+| `/state/circuits` | GET | Returns only circuit on/off states |
 | `/state/circuit/setState` | PUT | Toggle a circuit on or off |
 | `/events` | GET | Live update stream (Server-Sent Events) |
 | `/health` | GET | Is the bridge up and connected? |
+
+The `/state/all` response includes these fields:
+
+| Field | Type | Example |
+|-------|------|---------|
+| `airTemp` | number | `85` (degrees) |
+| `poolTemp` | number | `78` (degrees) |
+| `spaTemp` | number | `92` (degrees) |
+| `saltLevel` | number | `3200` (PPM) |
+| `poolChlorinator` | number | chlorinator % for pool mode |
+| `spaChlorinator` | number | chlorinator % for spa mode |
+| `pumpSpeed` | number | pump speed (%) |
+| `pumpPower` | number | pump power (watts) |
+| `isMetric` | boolean | `false` — if `true`, temps are Celsius and salt is g/L |
+| `isHeaterEnabled` | boolean | is the heater currently active |
+| `checkSystemMsg` | string/null | system warning message, if any |
+| `circuits` | object | `{"FILTER": true, "LIGHTS": false, ...}` |
 
 ---
 
@@ -354,18 +379,19 @@ VALVE_3  VALVE_4  HEATER_AUTO_MODE  FILTER_LOW_SPEED  SUPER_CHLORINATE
 - WiFi flaky? Run `ping google.com` — if it fails, the Pi lost its WiFi connection. `sudo reboot` usually fixes it.
 
 ### "The app loads but I see Demo Mode"
-- You need to tap the status badge and connect to the Pi's address. If you're on the same network as the Pi and accessed it via `poolcontroller.local`, it should auto-connect. If not, tap the badge and enter the Pi's IP and port 4200.
+- The app starts in Demo Mode when it can't reach the bridge. Demo mode shows fake data so you can preview the interface — toggles will appear to work but aren't sending real commands.
+- To connect to your real pool: tap the status badge at the top of the app and enter the Pi's address. If you accessed the app via `poolcontroller.local`, it should auto-connect. If not, enter the Pi's IP address and port 4200.
 
 ### "I want to update the software"
 Delete the old folder and re-download it (same as Step 5), then re-run the installer:
 ```bash
-cd ~
-rm -rf jareds-pool
-curl -L https://github.com/YOUR_USER/jareds-pool/archive/refs/heads/main.zip -o pool.zip
-unzip -o pool.zip
-mv jareds-pool-main jareds-pool
-cd jareds-pool
-bash scripts/install.sh
+cd ~                        # Go to your home folder
+rm -rf jareds-pool          # Delete the old project folder
+curl -L https://github.com/bryanweaver/jareds-pool/archive/refs/heads/main.zip -o pool.zip  # Download the latest version
+unzip -o pool.zip           # Extract it (overwrite if needed)
+mv jareds-pool-main jareds-pool  # Rename the folder
+cd jareds-pool              # Go into the project folder
+bash scripts/install.sh     # Re-run the installer
 ```
 
 ---
@@ -378,7 +404,7 @@ A Python program (`pool_bridge.py`) reads data from the controller, converts it 
 
 Nginx sits in front as a web server — it serves the HTML interface and forwards API requests to the bridge.
 
-The web app (`index.html`) is a single HTML file with no dependencies. It connects to the API, shows you live data via Server-Sent Events, and sends toggle commands when you tap a button.
+The web app (`index.html`) is a single HTML file with no dependencies. It connects to the API, shows you live data via Server-Sent Events, and sends toggle commands when you tap a button. It also includes a built-in interactive setup guide — open the app and look for the setup accordion if you need a refresher on wiring or configuration.
 
 ---
 

@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Pool Bridge — AquaLogic RS-485 → REST API + WebSocket
+Pool Bridge — AquaLogic RS-485 → REST API + SSE
 Runs on Raspberry Pi Zero 2W with MAX485 module connected to
 the Hayward AquaLogic REMOTE DISPLAY port.
 
 API:
   GET  /state/all              → full state JSON
+  GET  /state/circuits         → circuits only
   PUT  /state/circuit/setState  → {"circuit":"FILTER","state":true}
-  GET  /ws                     → WebSocket (live state push)
+  GET  /events                 → Server-Sent Events (live state push)
+  GET  /health                 → connection status
 """
 
 import json, threading, queue, time, logging, signal, sys
